@@ -100,3 +100,21 @@ export async function confirmPayphonePayment(req: Request, res: Response, next: 
     next(error);
   }
 }
+
+export async function lookupOrders(req: Request, res: Response, next: NextFunction) {
+  try {
+    const value = String(req.body?.value || "").trim();
+    if (!value) throw new CustomError("Ingresa tu correo o teléfono", 400);
+    const isEmail = value.includes("@");
+    const phoneDigits = value.replace(/\D/g, "");
+    if (!isEmail && phoneDigits.length < 8) throw new CustomError("Ingresa un teléfono válido", 400);
+
+    const query = isEmail
+      ? { "customer.email": value.toLowerCase() }
+      : { "customer.phone": { $regex: `${phoneDigits.slice(-9)}$` } };
+    const orders = await Order.find(query).sort({ createdAt: -1 }).limit(10).lean();
+    res.json(orders.map((order) => ({ orderNumber: order.orderNumber, items: order.items, total: order.total, status: order.status, createdAt: order.createdAt, delivery: order.delivery })));
+  } catch (error) {
+    next(error);
+  }
+}
