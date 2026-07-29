@@ -10,11 +10,24 @@ const whitelist = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:8101",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "https://testing-storybrand-frontend.bakano.ec",
 ];
+
+function isAllowedOrigin(origin: string) {
+  if (whitelist.includes(origin)) return true;
+  try {
+    const url = new URL(origin);
+    return url.protocol === "https:" && (url.hostname === "bakano.ec" || url.hostname.endsWith(".bakano.ec"));
+  } catch {
+    return false;
+  }
+}
 
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
-    if (!origin || whitelist.includes(origin)) {
+    if (!origin || isAllowedOrigin(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));

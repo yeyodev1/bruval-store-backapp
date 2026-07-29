@@ -21,6 +21,7 @@ const orderSchema = new Schema(
       name: { type: String, required: true, trim: true },
       email: { type: String, required: true, trim: true, lowercase: true },
       phone: { type: String, required: true, trim: true },
+      phoneConfirmed: { type: Boolean, required: true },
     },
     delivery: {
       recipient: { type: String, required: true, trim: true },
