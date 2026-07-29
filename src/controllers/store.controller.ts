@@ -79,6 +79,17 @@ export async function confirmPayphonePayment(req: Request, res: Response, next: 
     const order = await Order.findOne({ orderNumber: clientTransactionId });
     if (!order) throw new CustomError("Pedido no encontrado", 404);
 
+    // PayPhone redirects can be revisited. A confirmed payment must never be re-checked and downgraded.
+    if (order.status === "paid") {
+      res.json({
+        approved: true,
+        orderNumber: order.orderNumber,
+        message: "Pago confirmado",
+        order: { items: order.items, total: order.total, customer: order.customer, delivery: order.delivery, status: order.status },
+      });
+      return;
+    }
+
     const { data } = await axios.post(
       "https://paymentbox.payphonetodoesposible.com/api/confirm",
       { id: Number(id), clientTxId: clientTransactionId },
