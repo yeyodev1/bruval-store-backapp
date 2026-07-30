@@ -27,7 +27,17 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
   try {
     await ensureCatalog();
     const offer = await resolveOffer(_req.query.offerId);
-    const products = await Product.find({ available: true }).sort({ featured: -1, createdAt: 1 }).lean();
+    const page = Math.max(1, Number(_req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(_req.query.limit) || 50));
+    const skip = (page - 1) * limit;
+    const filter: Record<string, any> = { available: true };
+    if (typeof _req.query.category === 'string' && _req.query.category) {
+      filter.categories = { $in: [_req.query.category] };
+    }
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort({ featured: -1, createdAt: 1 }).skip(skip).limit(limit).lean(),
+      Product.countDocuments(filter),
+    ]);
     res.json({
       offer: { active: offer.active, expiresAt: offer.expiresAt },
       products: products.map((product) => ({
@@ -35,6 +45,7 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
         regularPrice: product.webExclusive ? product.regularPrice : offer.active ? product.price : undefined,
         price: product.webExclusive ? product.price : offer.active ? salePrice(product.price) : product.price,
       })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasMore: skip + products.length < total },
     });
   } catch (error) {
     next(error);
