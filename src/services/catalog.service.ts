@@ -19,7 +19,10 @@ export async function ensureCatalog() {
   await Product.insertMany(
     products.map(([name, description, price, image, palette], index) => ({
       name,
+      sku: `DEMO-${index + 1}`,
       slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""),
+      collection: "Catálogo temporal",
+      dimensions: "Por confirmar",
       description,
       price,
       image,

@@ -66,7 +66,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     const order = await Order.create({ orderNumber, items: normalizedItems, subtotal, deliveryFee: DELIVERY_FEE, total, customer, delivery });
 
     sendCheckoutStartedEmail(order).catch((error) => console.error("Checkout email failed", error));
-    res.status(201).json({ orderNumber, total, payphone: { token: process.env.PAYPHONE_TOKEN, storeId: process.env.PAYPHONE_STORE_ID } });
+    res.status(201).json({ orderNumber, total, payphone: { token: process.env.PAYPHONE_TOKEN?.trim(), storeId: process.env.PAYPHONE_STORE_ID?.trim() } });
   } catch (error) {
     next(error);
   }
@@ -93,7 +93,7 @@ export async function confirmPayphonePayment(req: Request, res: Response, next: 
     const { data } = await axios.post(
       "https://paymentbox.payphonetodoesposible.com/api/confirm",
       { id: Number(id), clientTxId: clientTransactionId },
-      { headers: { Authorization: `Bearer ${process.env.PAYPHONE_TOKEN}`, "Content-Type": "application/json" }, timeout: 15000 },
+      { headers: { Authorization: `Bearer ${process.env.PAYPHONE_TOKEN?.trim()}`, "Content-Type": "application/json" }, timeout: 15000 },
     );
     const approved = data.statusCode === 3 && data.transactionStatus === "Approved";
     order.status = approved ? "paid" : "payment_failed";
