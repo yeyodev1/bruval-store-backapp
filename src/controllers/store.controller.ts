@@ -32,8 +32,8 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
       offer: { active: offer.active, expiresAt: offer.expiresAt },
       products: products.map((product) => ({
         ...product,
-        regularPrice: offer.active ? product.price : undefined,
-        price: offer.active ? salePrice(product.price) : product.price,
+        regularPrice: product.webExclusive ? product.regularPrice : offer.active ? product.price : undefined,
+        price: product.webExclusive ? product.price : offer.active ? salePrice(product.price) : product.price,
       })),
     });
   } catch (error) {
