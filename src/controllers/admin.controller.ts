@@ -68,22 +68,60 @@ export async function listAdminProducts(req: AuthRequest, res: Response, next: N
   }
 }
 
+export async function createAdminProduct(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    await requireAdmin(req);
+    const { name, sku, collection, categories, palette, description, dimensions, image, price, available, featured } = req.body;
+    if (!name || !sku || !collection || !palette || !dimensions || !image || !description) {
+      throw new CustomError("Completa nombre, código, colección, paleta, medidas, descripción e imagen", 400);
+    }
+    const finalPrice = Number(price);
+    if (!Number.isFinite(finalPrice) || finalPrice < 0) throw new CustomError("El precio debe ser un valor válido", 400);
+    const slug = sku.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const product = await Product.create({
+      name: String(name).trim(),
+      sku: String(sku).trim(),
+      slug,
+      collection: String(collection).trim(),
+      categories: Array.isArray(categories) ? categories : [],
+      palette: String(palette).trim(),
+      description: String(description).trim(),
+      dimensions: String(dimensions).trim(),
+      image: String(image).trim(),
+      price: finalPrice,
+      available: available === true,
+      featured: featured === true,
+    });
+    res.status(201).json(product);
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      next(new CustomError("El código SKU ya existe", 409));
+    } else {
+      next(error);
+    }
+  }
+}
+
 export async function updateAdminProduct(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     await requireAdmin(req);
     const product = await Product.findById(req.params.id);
     if (!product) throw new CustomError("Producto no encontrado", 404);
 
-    const { name, description, sku, dimensions, image, price, available } = req.body;
+    const { name, description, sku, collection, categories, palette, dimensions, image, price, available, featured } = req.body;
     if (name !== undefined) product.name = String(name).trim();
     if (description !== undefined) product.description = String(description).trim();
     if (sku !== undefined) {
       product.sku = String(sku).trim();
       product.slug = product.sku.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     }
+    if (collection !== undefined) (product as any).collection = String(collection).trim();
+    if (categories !== undefined) product.categories = Array.isArray(categories) ? categories : [];
+    if (palette !== undefined) product.palette = String(palette).trim();
     if (dimensions !== undefined) product.dimensions = String(dimensions).trim();
     if (image !== undefined) product.image = String(image).trim();
     if (available !== undefined) product.available = available === true;
+    if (featured !== undefined) product.featured = featured === true;
     if (price !== undefined) {
       const finalPrice = Number(price);
       if (!Number.isFinite(finalPrice) || finalPrice < 0) throw new CustomError("El precio final debe ser un valor válido", 400);
@@ -92,8 +130,8 @@ export async function updateAdminProduct(req: AuthRequest, res: Response, next: 
       product.discountPercentage = undefined;
       product.webExclusive = false;
     }
-    if (!product.name || !product.sku || !product.dimensions || !product.image || !product.description) {
-      throw new CustomError("Completa nombre, código, medidas, descripción e imagen", 400);
+    if (!product.name || !product.sku || !product.collection || !product.palette || !product.dimensions || !product.image || !product.description) {
+      throw new CustomError("Completa nombre, código, colección, paleta, medidas, descripción e imagen", 400);
     }
     await product.save();
     res.json(product);
