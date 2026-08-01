@@ -19,6 +19,7 @@ const productSchema = new Schema(
     palette: { type: String, required: true },
     featured: { type: Boolean, default: false },
     available: { type: Boolean, default: true },
+    deletedAt: { type: Date },
   },
   { timestamps: true, suppressReservedKeysWarning: true },
 );
