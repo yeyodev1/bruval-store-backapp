@@ -9,6 +9,8 @@ import { Order } from "../models/order.model";
 import { Product } from "../models/product.model";
 import { AuthRequest } from "../types/AuthRequest";
 
+const DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1200&q=85";
+
 async function ensureInitialAdmin() {
   const email = process.env.ADMIN_EMAIL?.toLowerCase();
   const password = process.env.ADMIN_PASSWORD;
@@ -107,12 +109,13 @@ export async function createAdminProduct(req: AuthRequest, res: Response, next: 
   try {
     await requireAdmin(req);
     const { name, sku, collection, categories, palette, description, dimensions, image, price, available, featured } = req.body;
-    if (!name || !sku || !collection || !palette || !dimensions || !image || !description) {
-      throw new CustomError("Completa nombre, código, colección, paleta, medidas, descripción e imagen", 400);
+    if (!name || !sku || !collection || !palette || !dimensions || !description) {
+      throw new CustomError("Completa nombre, código, colección, paleta, medidas y descripción", 400);
     }
     const finalPrice = Number(price);
     if (!Number.isFinite(finalPrice) || finalPrice < 0) throw new CustomError("El precio debe ser un valor válido", 400);
     const slug = sku.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const finalImage = String(image || "").trim() || DEFAULT_PRODUCT_IMAGE;
     const product = await Product.create({
       name: String(name).trim(),
       sku: String(sku).trim(),
@@ -122,7 +125,7 @@ export async function createAdminProduct(req: AuthRequest, res: Response, next: 
       palette: String(palette).trim(),
       description: String(description).trim(),
       dimensions: String(dimensions).trim(),
-      image: String(image).trim(),
+      image: finalImage,
       price: finalPrice,
       available: available === true,
       featured: featured === true,
