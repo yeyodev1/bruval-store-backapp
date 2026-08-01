@@ -1,4 +1,6 @@
 import bcrypt from "bcryptjs";
+import axios from "axios";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { NextFunction, Response } from "express";
 import { CustomError } from "../errors/customError.error";
@@ -63,6 +65,39 @@ export async function listAdminProducts(req: AuthRequest, res: Response, next: N
     await requireAdmin(req);
     const products = await Product.find({ deletedAt: { $exists: false } }).sort({ available: -1, name: 1 }).lean();
     res.json(products);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function uploadAdminProductImage(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    await requireAdmin(req);
+    const dataUrl = String(req.body?.image || "");
+    const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([a-zA-Z0-9+/=]+)$/);
+    if (!match) throw new CustomError("Selecciona una imagen JPG, PNG o WEBP válida", 400);
+
+    const image = Buffer.from(match[2], "base64");
+    if (!image.length || image.length > 10 * 1024 * 1024) throw new CustomError("La imagen debe pesar máximo 10 MB", 400);
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    if (!cloudName || !apiKey || !apiSecret) throw new CustomError("La carga de imágenes no está configurada", 503);
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = "bruval/catalog";
+    const signature = crypto.createHash("sha1").update(`folder=${folder}&timestamp=${timestamp}${apiSecret}`).digest("hex");
+    const form = new FormData();
+    form.append("file", new Blob([image], { type: match[1] }), "producto");
+    form.append("api_key", apiKey);
+    form.append("timestamp", String(timestamp));
+    form.append("folder", folder);
+    form.append("signature", signature);
+
+    const { data } = await axios.post<{ secure_url?: string }>(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, form, { timeout: 120000 });
+    if (!data.secure_url) throw new CustomError("No pudimos guardar la imagen", 502);
+    res.status(201).json({ url: data.secure_url });
   } catch (error) {
     next(error);
   }
