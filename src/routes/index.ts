@@ -17,7 +17,7 @@ function routerApi(app: Application) {
   router.get("/admin/products", authMiddleware, listAdminProducts);
   router.post("/admin/products", authMiddleware, createAdminProduct);
   router.patch("/admin/products/:id", authMiddleware, updateAdminProduct);
-}
   router.delete("/admin/products/:id", authMiddleware, deleteAdminProduct);
 
+}
 export default routerApi;
