@@ -61,7 +61,7 @@ export async function createAdminUser(req: AuthRequest, res: Response, next: Nex
 export async function listAdminProducts(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     await requireAdmin(req);
-    const products = await Product.find().sort({ available: -1, name: 1 }).lean();
+    const products = await Product.find({ deletedAt: { $exists: false } }).sort({ available: -1, name: 1 }).lean();
     res.json(products);
   } catch (error) {
     next(error);
@@ -105,7 +105,7 @@ export async function createAdminProduct(req: AuthRequest, res: Response, next: 
 export async function updateAdminProduct(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     await requireAdmin(req);
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findOne({ _id: req.params.id, deletedAt: { $exists: false } });
     if (!product) throw new CustomError("Producto no encontrado", 404);
 
     const { name, description, sku, collection, categories, palette, dimensions, image, price, available, featured } = req.body;
@@ -135,6 +135,22 @@ export async function updateAdminProduct(req: AuthRequest, res: Response, next: 
     }
     await product.save();
     res.json(product);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteAdminProduct(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    await requireAdmin(req);
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, deletedAt: { $exists: false } },
+      { available: false, deletedAt: new Date() },
+      { new: true },
+    );
+    if (!product) throw new CustomError("Producto no encontrado", 404);
+
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

@@ -1,6 +1,6 @@
 import express, { Application } from "express";
 import { confirmPayphonePayment, createOrder, listProducts, lookupOrders } from "../controllers/store.controller";
-import { createAdminProduct, createAdminUser, listAdminProducts, listOrders, loginAdmin, updateAdminProduct } from "../controllers/admin.controller";
+import { createAdminProduct, createAdminUser, deleteAdminProduct, listAdminProducts, listOrders, loginAdmin, updateAdminProduct } from "../controllers/admin.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 
 function routerApi(app: Application) {
@@ -18,5 +18,6 @@ function routerApi(app: Application) {
   router.post("/admin/products", authMiddleware, createAdminProduct);
   router.patch("/admin/products/:id", authMiddleware, updateAdminProduct);
 }
+  router.delete("/admin/products/:id", authMiddleware, deleteAdminProduct);
 
 export default routerApi;
