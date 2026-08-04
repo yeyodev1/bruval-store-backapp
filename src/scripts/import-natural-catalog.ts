@@ -110,7 +110,7 @@ async function main() {
       name: source.name,
       slug: source.slug,
       collection: categories[0] || "Flores naturales",
-      categories,
+      categories: ["Naturales"],
       dimensions: source.formatted_dimensions && source.formatted_dimensions !== "N/D" ? source.formatted_dimensions : "Medidas por confirmar",
       description: cleanText(source.description) || source.name,
       price,

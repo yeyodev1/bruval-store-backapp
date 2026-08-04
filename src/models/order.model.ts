@@ -27,6 +27,7 @@ const orderSchema = new Schema(
       recipient: { type: String, required: true, trim: true },
       address: { type: String, required: true, trim: true },
       mapUrl: { type: String, required: true, trim: true },
+      zone: { type: String, required: true, trim: true },
       date: { type: String, required: true, trim: true },
       timeSlot: { type: String, required: true, trim: true },
       messageCard: { type: String, required: true, trim: true },

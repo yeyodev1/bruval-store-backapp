@@ -6,9 +6,14 @@ import { Product } from "../models/product.model";
 import { ensureCatalog } from "../services/catalog.service";
 import { sendCheckoutStartedEmail, sendPaymentConfirmedEmail } from "../services/email.service";
 import { resolveOffer, salePrice } from "../services/offer.service";
+import { deliveryFeeForZone } from "../services/shipping.service";
 
-const DELIVERY_FEE = 4.5;
 const MINIMUM_DELIVERY_LEAD_MS = 2 * 60 * 60 * 1000;
+
+function catalogCategory(product: { categories?: string[]; source?: string | null }) {
+  if (product.categories?.includes("Naturales") || product.source === "bruval.com.ec") return "Naturales";
+  return "Preservados";
+}
 
 function validateDeliveryWindow(date: unknown, timeSlot: unknown) {
   if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || typeof timeSlot !== "string") {
@@ -31,17 +36,21 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
     const limit = Math.min(50, Math.max(1, Number(_req.query.limit) || 50));
     const skip = (page - 1) * limit;
     const filter: Record<string, any> = { available: true };
-    if (typeof _req.query.category === 'string' && _req.query.category) {
-      filter.categories = { $in: [_req.query.category] };
+    if (_req.query.category === "Naturales") {
+      filter.$or = [{ categories: "Naturales" }, { source: "bruval.com.ec" }];
+    } else if (_req.query.category === "Preservados") {
+      filter.$or = [{ categories: "Preservados" }, { source: { $ne: "bruval.com.ec" } }];
     }
     const [products, total] = await Promise.all([
-      Product.find(filter).sort({ featured: -1, createdAt: 1 }).skip(skip).limit(limit).lean(),
+      Product.find(filter).sort({ featured: -1, createdAt: 1, _id: 1 }).skip(skip).limit(limit).lean(),
       Product.countDocuments(filter),
     ]);
+    res.set("Cache-Control", "no-store");
     res.json({
       offer: { active: offer.active, expiresAt: offer.expiresAt },
       products: products.map((product) => ({
         ...product,
+        categories: [catalogCategory(product)],
         regularPrice: product.webExclusive ? product.regularPrice : offer.active ? product.price : undefined,
         price: product.webExclusive ? product.price : offer.active ? salePrice(product.price) : product.price,
       })),
@@ -55,10 +64,11 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const { items, customer, delivery, offerId } = req.body;
-    if (!Array.isArray(items) || !items.length || !customer?.email || !customer?.name || !customer?.phone || customer.phoneConfirmed !== true || !delivery?.recipient || !delivery?.address || !delivery?.mapUrl || !delivery?.date || !delivery?.timeSlot || !delivery?.messageCard) {
+    if (!Array.isArray(items) || !items.length || !customer?.email || !customer?.name || !customer?.phone || customer.phoneConfirmed !== true || !delivery?.recipient || !delivery?.address || !delivery?.mapUrl || !delivery?.zone || !delivery?.date || !delivery?.timeSlot || !delivery?.messageCard) {
       throw new CustomError("Completa todos los datos de entrega y contacto", 400);
     }
     validateDeliveryWindow(delivery.date, delivery.timeSlot);
+    const deliveryFee = deliveryFeeForZone(delivery.zone);
 
     const ids = items.map((item: { productId: string }) => item.productId);
     const products = await Product.find({ _id: { $in: ids }, available: true }).lean();
@@ -72,9 +82,9 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       return { product: product._id, name: product.name, price: offer.active ? salePrice(product.price) : product.price, quantity };
     });
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const total = subtotal + DELIVERY_FEE;
+    const total = subtotal + deliveryFee;
     const orderNumber = `BRV-${Date.now().toString(36).toUpperCase()}`;
-    const order = await Order.create({ orderNumber, items: normalizedItems, subtotal, deliveryFee: DELIVERY_FEE, total, customer, delivery });
+    const order = await Order.create({ orderNumber, items: normalizedItems, subtotal, deliveryFee, total, customer, delivery });
 
     sendCheckoutStartedEmail(order).catch((error) => console.error("Checkout email failed", error));
     res.status(201).json({ orderNumber, total, payphone: { token: process.env.PAYPHONE_TOKEN?.trim(), storeId: process.env.PAYPHONE_STORE_ID?.trim() } });

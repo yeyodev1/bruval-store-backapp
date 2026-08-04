@@ -24,6 +24,7 @@ type CatalogProduct = {
   description: string;
   imageFile: string;
   palette: string;
+  categories?: string[];
 };
 
 const catalog: CatalogProduct[] = [
@@ -40,7 +41,7 @@ const catalog: CatalogProduct[] = [
   { sku: "RP85", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "18 x 27 cm", price: 99, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "042.png", palette: "Rojo" },
   { sku: "RP90", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "14 x 27 cm", price: 115, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "037.png", palette: "Rojo" },
   { sku: "RP95", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "18 x 20 cm", price: 79, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "062.png", palette: "Multicolor" },
-  { sku: "RP100", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "10 x 18 cm", price: 59, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "RP10.png", palette: "Rojo" },
+  { sku: "RP100", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "10 x 18 cm", price: 59, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "RP100.png", palette: "Rojo" },
   { sku: "RP130", name: "Cúpula corazón de mini rosas rojas", collection: "Love Collection", dimensions: "21 x 24 cm", price: 149, description: "Corazón entero de mini rosas rojas preservadas con musgo preservado.", imageFile: "RP-130.png", palette: "Rojo" },
   { sku: "RP135", name: "Cúpula XL Deluxe corazón de rosas rojas", collection: "Love Collection", dimensions: "30 x 42 cm", price: 279, description: "Corazón de rosas preservadas tamaño small con tallos y un lazo como detalle final.", imageFile: "RP-135.png", palette: "Rojo" },
   { sku: "RP140", name: "Caja acrílica negra corazón de mini rosas rojas", collection: "Love Collection", dimensions: "24 x 24 cm", price: 159, description: "Caja cuadrada acrílica de fondo negro con mini rosas preservadas formando un corazón romántico.", imageFile: "RP-140.png", palette: "Rojo" },
@@ -102,7 +103,7 @@ async function main() {
     await Product.bulkWrite(uploaded.map(({ imagePath: _imagePath, image, ...product }, index) => ({
       updateOne: {
         filter: { sku: product.sku },
-        update: { $set: { ...product, image, slug: slug(product.sku), featured: index < 3, available: true } },
+        update: { $set: { ...product, categories: product.categories || ["Preservados"], image, slug: slug(product.sku), featured: index < 3, available: true } },
         upsert: true,
       },
     })));
