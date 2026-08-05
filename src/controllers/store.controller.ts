@@ -46,7 +46,8 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
     }
 
     if (_req.query.search) {
-      const searchRegex = new RegExp(String(_req.query.search).trim(), "i");
+      const escaped = String(_req.query.search).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const searchRegex = new RegExp(escaped, "i");
       andFilters.push({
         $or: [
           { name: searchRegex },
