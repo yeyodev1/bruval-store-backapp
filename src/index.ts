@@ -1,6 +1,10 @@
+import dns from "node:dns";
 import dotenv from "dotenv";
 import { dbConnect } from "./config/mongo";
 import { createApp } from "./app";
+
+dns.setDefaultResultOrder("ipv4first");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 async function main() {
   dotenv.config();

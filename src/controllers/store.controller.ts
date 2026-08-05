@@ -35,14 +35,43 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
     const page = Math.max(1, Number(_req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(_req.query.limit) || 50));
     const skip = (page - 1) * limit;
+
     const filter: Record<string, any> = { available: true };
+    const andFilters: any[] = [];
+
     if (_req.query.category === "Naturales") {
-      filter.$or = [{ categories: "Naturales" }, { source: "bruval.com.ec" }];
+      andFilters.push({ $or: [{ categories: "Naturales" }, { source: "bruval.com.ec" }] });
     } else if (_req.query.category === "Preservados") {
-      filter.$or = [{ categories: "Preservados" }, { source: { $ne: "bruval.com.ec" } }];
+      andFilters.push({ $or: [{ categories: "Preservados" }, { source: { $ne: "bruval.com.ec" } }] });
     }
+
+    if (_req.query.search) {
+      const searchRegex = new RegExp(String(_req.query.search).trim(), "i");
+      andFilters.push({
+        $or: [
+          { name: searchRegex },
+          { sku: searchRegex },
+          { collection: searchRegex },
+          { description: searchRegex }
+        ]
+      });
+    }
+
+    if (andFilters.length > 0) {
+      filter.$and = andFilters;
+    }
+
+    let sortObj: any = { featured: -1, createdAt: 1, _id: 1 };
+    if (_req.query.sort === "featured") {
+      sortObj = { featured: -1, name: 1 };
+    } else if (_req.query.sort === "seasonal") {
+      sortObj = { createdAt: -1 };
+    } else if (_req.query.sort === "quality") {
+      sortObj = { featured: -1, createdAt: 1, _id: 1 };
+    }
+
     const [products, total] = await Promise.all([
-      Product.find(filter).sort({ featured: -1, createdAt: 1, _id: 1 }).skip(skip).limit(limit).lean(),
+      Product.find(filter).sort(sortObj).skip(skip).limit(limit).lean(),
       Product.countDocuments(filter),
     ]);
     res.set("Cache-Control", "no-store");

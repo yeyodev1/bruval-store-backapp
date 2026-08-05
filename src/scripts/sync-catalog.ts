@@ -1,3 +1,4 @@
+import dns from "node:dns";
 import crypto from "crypto";
 import fs from "fs/promises";
 import os from "os";
@@ -9,6 +10,9 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { dbConnect } from "../config/mongo";
 import { Product } from "../models/product.model";
+
+dns.setDefaultResultOrder("ipv4first");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 dotenv.config();
 
@@ -41,7 +45,7 @@ const catalog: CatalogProduct[] = [
   { sku: "RP85", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "18 x 27 cm", price: 99, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "042.png", palette: "Rojo" },
   { sku: "RP90", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "14 x 27 cm", price: 115, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "037.png", palette: "Rojo" },
   { sku: "RP95", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "18 x 20 cm", price: 79, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "062.png", palette: "Multicolor" },
-  { sku: "RP100", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "10 x 18 cm", price: 59, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "RP100.png", palette: "Rojo" },
+  { sku: "RP100", name: "Árbol de amor", collection: "Árbol de Amor", dimensions: "10 x 18 cm", price: 59, description: "Decoración exclusiva en tronco natural preservado con gypsophilia y musgo preservado.", imageFile: "RP-100.png", palette: "Rojo" },
   { sku: "RP130", name: "Cúpula corazón de mini rosas rojas", collection: "Love Collection", dimensions: "21 x 24 cm", price: 149, description: "Corazón entero de mini rosas rojas preservadas con musgo preservado.", imageFile: "RP-130.png", palette: "Rojo" },
   { sku: "RP135", name: "Cúpula XL Deluxe corazón de rosas rojas", collection: "Love Collection", dimensions: "30 x 42 cm", price: 279, description: "Corazón de rosas preservadas tamaño small con tallos y un lazo como detalle final.", imageFile: "RP-135.png", palette: "Rojo" },
   { sku: "RP140", name: "Caja acrílica negra corazón de mini rosas rojas", collection: "Love Collection", dimensions: "24 x 24 cm", price: 159, description: "Caja cuadrada acrílica de fondo negro con mini rosas preservadas formando un corazón romántico.", imageFile: "RP-140.png", palette: "Rojo" },
@@ -90,24 +94,47 @@ async function main() {
   const apiKey = required("CLOUDINARY_API_KEY");
   const apiSecret = required("CLOUDINARY_API_SECRET");
   const imagesDir = required("PRODUCT_IMAGES_DIR");
-  const products = await Promise.all(catalog.map(async (product) => {
-    const imagePath = path.join(imagesDir, product.imageFile);
-    await fs.access(imagePath);
-    return { ...product, imagePath };
-  }));
 
-  const uploaded = await Promise.all(products.map(async (product) => ({ ...product, image: await uploadImage(product.imagePath, product.sku, cloudName, apiKey, apiSecret) })));
   await dbConnect();
   try {
-    await Product.updateMany({}, { $set: { available: false } });
-    await Product.bulkWrite(uploaded.map(({ imagePath: _imagePath, image, ...product }, index) => ({
+    const productsToSync = [];
+    for (const product of catalog) {
+      const imagePath = path.join(imagesDir, product.imageFile);
+      let imageExists = false;
+      try {
+        await fs.access(imagePath);
+        imageExists = true;
+      } catch {}
+
+      let imageUrl = "";
+      if (imageExists) {
+        console.log(`Uploading local image for ${product.sku}...`);
+        imageUrl = await uploadImage(imagePath, product.sku, cloudName, apiKey, apiSecret);
+      } else {
+        // Find existing product in DB to reuse its image
+        const existing = await Product.findOne({ sku: product.sku }).lean();
+        if (existing?.image) {
+          console.log(`Reusing existing image from DB for ${product.sku}`);
+          imageUrl = existing.image;
+        } else {
+          console.warn(`Warning: Image ${product.imageFile} does not exist locally and no product found in DB.`);
+          continue;
+        }
+      }
+      productsToSync.push({ ...product, image: imageUrl });
+    }
+
+    // Set non-WooCommerce products to available: false temporarily
+    await Product.updateMany({ source: { $ne: "bruval.com.ec" } }, { $set: { available: false } });
+
+    await Product.bulkWrite(productsToSync.map((product, index) => ({
       updateOne: {
         filter: { sku: product.sku },
-        update: { $set: { ...product, categories: product.categories || ["Preservados"], image, slug: slug(product.sku), featured: index < 3, available: true } },
+        update: { $set: { ...product, categories: product.categories || ["Preservados"], slug: slug(product.sku), featured: index < 3, available: true } },
         upsert: true,
       },
     })));
-    console.log(`Uploaded and synchronized ${uploaded.length} products.`);
+    console.log(`Uploaded and synchronized ${productsToSync.length} products.`);
   } finally {
     await mongoose.disconnect();
   }
