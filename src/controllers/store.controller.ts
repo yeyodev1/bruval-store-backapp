@@ -5,7 +5,7 @@ import { Order } from "../models/order.model";
 import { Product } from "../models/product.model";
 import { ensureCatalog } from "../services/catalog.service";
 import { sendCheckoutStartedEmail, sendPaymentConfirmedEmail } from "../services/email.service";
-import { resolveOffer, salePrice } from "../services/offer.service";
+import { resolveOffer } from "../services/offer.service";
 import { deliveryFeeForZone } from "../services/shipping.service";
 
 const MINIMUM_DELIVERY_LEAD_MS = 2 * 60 * 60 * 1000;
@@ -51,8 +51,8 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
       products: products.map((product) => ({
         ...product,
         categories: [catalogCategory(product)],
-        regularPrice: product.webExclusive ? product.regularPrice : offer.active ? product.price : undefined,
-        price: product.webExclusive ? product.price : offer.active ? salePrice(product.price) : product.price,
+        regularPrice: product.webExclusive ? product.regularPrice : undefined,
+        price: product.price,
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasMore: skip + products.length < total },
     });
@@ -79,7 +79,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       const product = products.find((entry) => entry._id.toString() === item.productId);
       const quantity = Math.max(1, Math.min(10, Number(item.quantity) || 1));
       if (!product) throw new CustomError("Producto inválido", 400);
-      return { product: product._id, name: product.name, price: offer.active ? salePrice(product.price) : product.price, quantity };
+      return { product: product._id, name: product.name, price: product.price, quantity };
     });
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const total = subtotal + deliveryFee;

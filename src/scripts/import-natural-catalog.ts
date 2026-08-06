@@ -94,7 +94,7 @@ async function main() {
   const cloudName = required("CLOUDINARY_CLOUD_NAME");
   const apiKey = required("CLOUDINARY_API_KEY");
   const apiSecret = required("CLOUDINARY_API_SECRET");
-  const sourceProducts = await fetchProducts();
+  const sourceProducts = (await fetchProducts()).filter((p) => p.sku?.toUpperCase() !== "BVBOX240");
   if (!sourceProducts.length) throw new Error("The source catalog returned no products");
 
   const imported = await inBatches(sourceProducts, async (source): Promise<ImportedProduct> => {
@@ -126,6 +126,7 @@ async function main() {
 
   await dbConnect();
   try {
+    await Product.deleteMany({ sku: { $regex: /^BVBOX240$/i } });
     await Product.updateMany({ source: "bruval.com.ec" }, { $set: { available: false } });
     await Product.bulkWrite(imported.map((product) => ({
       updateOne: {
