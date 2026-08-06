@@ -1,9 +1,15 @@
+import dns from "node:dns";
+import fs from "fs/promises";
+import path from "path";
 import crypto from "crypto";
 import axios from "axios";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { dbConnect } from "../config/mongo";
 import { Product } from "../models/product.model";
+
+dns.setDefaultResultOrder("ipv4first");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 dotenv.config();
 
@@ -90,11 +96,54 @@ async function inBatches<T, R>(items: T[], worker: (item: T) => Promise<R>) {
   return results;
 }
 
+async function getLocalImagePath(imagesDir: string, sourceId: number): Promise<string | null> {
+  const possibleNames = [
+    `${sourceId}.png`,
+    `${sourceId}.jpg`,
+    `${sourceId}.jpeg`,
+    `0${sourceId}.png`,
+    `0${sourceId}.jpg`,
+    `0${sourceId}.jpeg`,
+    `${String(sourceId).padStart(3, '0')}.png`,
+    `${String(sourceId).padStart(3, '0')}.jpg`,
+    `${String(sourceId).padStart(3, '0')}.jpeg`,
+  ];
+  for (const name of possibleNames) {
+    const filePath = path.join(imagesDir, name);
+    try {
+      await fs.access(filePath);
+      return filePath;
+    } catch {}
+  }
+  return null;
+}
+
+async function uploadLocalImage(filePath: string, sourceId: number, cloudName: string, apiKey: string, apiSecret: string) {
+  const data = await fs.readFile(filePath);
+  const timestamp = Math.floor(Date.now() / 1000);
+  const publicId = `bruval/naturales/${sourceId}`;
+  const signature = crypto.createHash("sha1").update(`overwrite=true&public_id=${publicId}&timestamp=${timestamp}${apiSecret}`).digest("hex");
+  const form = new FormData();
+  form.append("file", new Blob([data]), `bruval-${sourceId}.webp`);
+  form.append("api_key", apiKey);
+  form.append("timestamp", String(timestamp));
+  form.append("public_id", publicId);
+  form.append("overwrite", "true");
+  form.append("signature", signature);
+  const { data: resData } = await axios.post<{ secure_url: string }>(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, form, { timeout: 120000 });
+  return resData.secure_url;
+}
+
 async function main() {
   const cloudName = required("CLOUDINARY_CLOUD_NAME");
   const apiKey = required("CLOUDINARY_API_KEY");
   const apiSecret = required("CLOUDINARY_API_SECRET");
+<<<<<<< HEAD
   const sourceProducts = (await fetchProducts()).filter((p) => p.sku?.toUpperCase() !== "BVBOX240");
+=======
+  const imagesDir = process.env.PRODUCT_IMAGES_DIR || "";
+  const sourceProducts = await fetchProducts();
+>>>>>>> origin/main
   if (!sourceProducts.length) throw new Error("The source catalog returned no products");
 
   const imported = await inBatches(sourceProducts, async (source): Promise<ImportedProduct> => {
@@ -104,6 +153,17 @@ async function main() {
     const regularPrice = money(source.prices.regular_price || source.prices.price, source.prices.currency_minor_unit);
     const price = money(source.prices.price, source.prices.currency_minor_unit);
     const webExclusive = source.on_sale && regularPrice > price;
+
+    // Check if there is a local image override
+    const localImagePath = imagesDir ? await getLocalImagePath(imagesDir, source.id) : null;
+    let finalImageUrl: string;
+    if (localImagePath) {
+      console.log(`Using local image override for natural product ${source.id}: ${localImagePath}`);
+      finalImageUrl = await uploadLocalImage(localImagePath, source.id, cloudName, apiKey, apiSecret);
+    } else {
+      finalImageUrl = await uploadImage(image, source.id, cloudName, apiKey, apiSecret);
+    }
+
     return {
       sourceProductId: String(source.id),
       sku: source.sku || `BRUVAL-${source.id}`,
@@ -118,7 +178,7 @@ async function main() {
       discountPercentage: webExclusive ? Math.round((1 - price / regularPrice) * 100) : undefined,
       webExclusive,
       available: source.is_in_stock,
-      image: await uploadImage(image, source.id, cloudName, apiKey, apiSecret),
+      image: finalImageUrl,
       palette: categories[0] || "Natural",
       source: "bruval.com.ec",
     };
