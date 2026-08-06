@@ -7,8 +7,6 @@
     "build": "tsc",
     "compile": "tsc --watch",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "catalog:sync": "ts-node src/scripts/sync-catalog.ts",
-    "catalog:import-natural": "ts-node src/scripts/import-natural-catalog.ts",
     "start": "node dist/index.js",
     "format": "prettier --write 'src/**/*.{js,jsx,ts,tsx,json,css,scss,md}'"
   },
