@@ -108,12 +108,14 @@ export async function uploadAdminProductImage(req: AuthRequest, res: Response, n
 export async function createAdminProduct(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     await requireAdmin(req);
-    const { name, sku, collection, categories, palette, description, dimensions, image, price, available, featured } = req.body;
+    const { name, sku, collection, categories, palette, description, dimensions, image, price, regularPrice, available, featured } = req.body;
     if (!name || !sku || !collection || !palette || !dimensions || !description) {
       throw new CustomError("Completa nombre, código, colección, paleta, medidas y descripción", 400);
     }
     const finalPrice = Number(price);
     if (!Number.isFinite(finalPrice) || finalPrice < 0) throw new CustomError("El precio debe ser un valor válido", 400);
+    const finalRegularPrice = regularPrice ? Number(regularPrice) : undefined;
+    const hasDiscount = Boolean(finalRegularPrice && finalRegularPrice > finalPrice);
     const slug = sku.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const finalImage = String(image || "").trim() || DEFAULT_PRODUCT_IMAGE;
     const product = await Product.create({
@@ -127,6 +129,8 @@ export async function createAdminProduct(req: AuthRequest, res: Response, next: 
       dimensions: String(dimensions).trim(),
       image: finalImage,
       price: finalPrice,
+      regularPrice: hasDiscount ? finalRegularPrice : undefined,
+      discountPercentage: hasDiscount ? Math.round((1 - finalPrice / (finalRegularPrice as number)) * 100) : undefined,
       available: available === true,
       featured: featured === true,
     });
@@ -146,7 +150,7 @@ export async function updateAdminProduct(req: AuthRequest, res: Response, next: 
     const product = await Product.findOne({ _id: req.params.id, deletedAt: { $exists: false } });
     if (!product) throw new CustomError("Producto no encontrado", 404);
 
-    const { name, description, sku, collection, categories, palette, dimensions, image, price, available, featured } = req.body;
+    const { name, description, sku, collection, categories, palette, dimensions, image, price, regularPrice, available, featured } = req.body;
     if (name !== undefined) product.name = String(name).trim();
     if (description !== undefined) product.description = String(description).trim();
     if (sku !== undefined) {
@@ -160,13 +164,18 @@ export async function updateAdminProduct(req: AuthRequest, res: Response, next: 
     if (image !== undefined) product.image = String(image).trim();
     if (available !== undefined) product.available = available === true;
     if (featured !== undefined) product.featured = featured === true;
-    if (price !== undefined) {
-      const finalPrice = Number(price);
+    if (price !== undefined || regularPrice !== undefined) {
+      const finalPrice = price !== undefined ? Number(price) : product.price;
       if (!Number.isFinite(finalPrice) || finalPrice < 0) throw new CustomError("El precio final debe ser un valor válido", 400);
       product.price = finalPrice;
-      product.regularPrice = undefined;
-      product.discountPercentage = undefined;
-      product.webExclusive = false;
+      const finalRegular = regularPrice !== undefined ? Number(regularPrice) : product.regularPrice;
+      if (finalRegular && finalRegular > finalPrice) {
+        product.regularPrice = finalRegular;
+        product.discountPercentage = Math.round((1 - finalPrice / finalRegular) * 100);
+      } else {
+        product.regularPrice = undefined;
+        product.discountPercentage = undefined;
+      }
     }
     if (!product.name || !product.sku || !product.collection || !product.palette || !product.dimensions || !product.image || !product.description) {
       throw new CustomError("Completa nombre, código, colección, paleta, medidas, descripción e imagen", 400);

@@ -81,7 +81,7 @@ export async function listProducts(_req: Request, res: Response, next: NextFunct
       products: products.map((product) => ({
         ...product,
         categories: [catalogCategory(product)],
-        regularPrice: product.webExclusive ? product.regularPrice : undefined,
+        regularPrice: product.regularPrice && product.regularPrice > product.price ? product.regularPrice : (product.webExclusive ? product.regularPrice : undefined),
         price: product.price,
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit), hasMore: skip + products.length < total },

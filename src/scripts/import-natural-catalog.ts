@@ -138,12 +138,8 @@ async function main() {
   const cloudName = required("CLOUDINARY_CLOUD_NAME");
   const apiKey = required("CLOUDINARY_API_KEY");
   const apiSecret = required("CLOUDINARY_API_SECRET");
-<<<<<<< HEAD
-  const sourceProducts = (await fetchProducts()).filter((p) => p.sku?.toUpperCase() !== "BVBOX240");
-=======
   const imagesDir = process.env.PRODUCT_IMAGES_DIR || "";
-  const sourceProducts = await fetchProducts();
->>>>>>> origin/main
+  const sourceProducts = (await fetchProducts()).filter((p) => p.sku?.toUpperCase() !== "BVBOX240");
   if (!sourceProducts.length) throw new Error("The source catalog returned no products");
 
   const imported = await inBatches(sourceProducts, async (source): Promise<ImportedProduct> => {
