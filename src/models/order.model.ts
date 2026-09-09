@@ -4,6 +4,7 @@ const orderItemSchema = new Schema(
   {
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     name: { type: String, required: true },
+    sku: { type: String, trim: true },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
   },
@@ -41,6 +42,13 @@ const orderSchema = new Schema(
       transactionId: Number,
       authorizationCode: String,
       status: String,
+    },
+    /** Identificadores del Pixel de Meta para atribuir la compra en la Conversions API. */
+    tracking: {
+      fbp: { type: String, trim: true },
+      fbc: { type: String, trim: true },
+      eventSourceUrl: { type: String, trim: true },
+      purchaseSent: { type: Boolean, default: false },
     },
   },
   { timestamps: true },

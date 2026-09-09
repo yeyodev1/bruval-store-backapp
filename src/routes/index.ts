@@ -1,5 +1,5 @@
 import express, { Application } from "express";
-import { confirmPayphonePayment, createOrder, listProducts, lookupOrders } from "../controllers/store.controller";
+import { confirmPayphonePayment, createOrder, getProductBySlug, listProducts, lookupOrders, productsSitemap, relayMetaEvent } from "../controllers/store.controller";
 import { createAdminProduct, createAdminUser, deleteAdminProduct, listAdminProducts, listOrders, loginAdmin, updateAdminProduct, uploadAdminProductImage } from "../controllers/admin.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 
@@ -8,6 +8,9 @@ function routerApi(app: Application) {
   app.use("/api", router);
 
   router.get("/products", listProducts);
+  router.get("/products/sitemap.xml", productsSitemap);
+  router.get("/products/:slug", getProductBySlug);
+  router.post("/meta/events", relayMetaEvent);
   router.post("/orders", createOrder);
   router.post("/orders/lookup", lookupOrders);
   router.post("/payments/payphone/confirm", confirmPayphonePayment);
