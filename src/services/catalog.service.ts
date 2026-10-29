@@ -13,8 +13,44 @@ const products = [
   ["Siempre", "Orquídeas, rosas y follaje escultórico para los momentos que perduran.", 74, "https://images.unsplash.com/photo-1469259943454-aa100abba749?auto=format&fit=crop&w=1200&q=85", "Orchid"],
 ] as const;
 
+/**
+ * Productos de las landings de campaña que aún no existían en el catálogo.
+ * Solo se crean si faltan ($setOnInsert): precio, nombre y fotos se editan
+ * desde el admin y nunca se pisan. Precio base provisional hasta que Bruval
+ * confirme el real (al público se le suma PRICE_ADJUSTMENT).
+ */
+const landingProducts = [
+  {
+    sku: "BVRAMO01",
+    slug: "ramo-rosas-preservadas",
+    name: "Ramo de rosas preservadas",
+    collection: "Rosas preservadas",
+    categories: ["Preservados"],
+    dimensions: "Medidas por confirmar",
+    description: "Rosas rojas preservadas con follaje, armadas en un florero de cerámica blanca con lazo rojo. No necesitan agua y conservan su color por años.",
+    price: 109,
+    image: "https://store.bruval.com.ec/landings/ramo-rosas-preservadas/01.webp",
+    palette: "Rojo",
+    featured: true,
+  },
+];
+
+let landingProductsReady: Promise<unknown> | undefined;
+
+function ensureLandingProducts() {
+  landingProductsReady ??= Promise.all(
+    landingProducts.map((product) =>
+      Product.updateOne({ sku: product.sku }, { $setOnInsert: product }, { upsert: true }),
+    ),
+  ).catch((error) => {
+    landingProductsReady = undefined;
+    console.error("No se pudieron crear los productos de las landings", error);
+  });
+  return landingProductsReady;
+}
+
 export async function ensureCatalog() {
-  if (await Product.exists({})) return;
+  if (await Product.exists({})) return ensureLandingProducts();
 
   await Product.insertMany(
     products.map(([name, description, price, image, palette], index) => ({
