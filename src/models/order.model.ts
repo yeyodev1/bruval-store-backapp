@@ -5,6 +5,8 @@ const orderItemSchema = new Schema(
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
     name: { type: String, required: true },
     sku: { type: String, trim: true },
+    /** Color elegido en la landing; también va al final de `name` para que se vea en correos y en el admin. */
+    variant: { type: String, trim: true },
     price: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1 },
   },

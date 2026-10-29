@@ -16,23 +16,32 @@ const products = [
 /**
  * Productos de las landings de campaña que aún no existían en el catálogo.
  * Solo se crean si faltan ($setOnInsert): precio, nombre y fotos se editan
- * desde el admin y nunca se pisan. Precio base provisional hasta que Bruval
- * confirme el real (al público se le suma PRICE_ADJUSTMENT).
+ * desde el admin y nunca se pisan. Precio base confirmado por Bruval el
+ * 29 oct 2026: $89 + PRICE_ADJUSTMENT = $99 al público.
  */
 const landingProducts = [
   {
     sku: "BVRAMO01",
     slug: "ramo-rosas-preservadas",
-    name: "Ramo de rosas preservadas",
+    name: "Jarrón de rosas preservadas",
     collection: "Rosas preservadas",
     categories: ["Preservados"],
     dimensions: "Medidas por confirmar",
     description: "Rosas rojas preservadas con follaje, armadas en un florero de cerámica blanca con lazo rojo. No necesitan agua y conservan su color por años.",
-    price: 109,
+    price: 89,
     image: "https://store.bruval.com.ec/landings/ramo-rosas-preservadas/01.webp",
     palette: "Rojo",
     featured: true,
   },
+];
+
+/**
+ * Correcciones de una sola vez sobre datos que sembramos con valores provisionales.
+ * El filtro exige el valor provisional, así que nunca pisa lo que se edite en el admin.
+ */
+const landingProductFixes = [
+  // El ramo se sembró a $109 base; Bruval confirmó el 29 oct 2026 "Jarrón de Rosas Preservadas $99".
+  { filter: { sku: "BVRAMO01", price: 109 }, set: { price: 89, name: "Jarrón de rosas preservadas" } },
 ];
 
 let landingProductsReady: Promise<unknown> | undefined;
@@ -42,7 +51,9 @@ function ensureLandingProducts() {
     landingProducts.map((product) =>
       Product.updateOne({ sku: product.sku }, { $setOnInsert: product }, { upsert: true }),
     ),
-  ).catch((error) => {
+  ).then(() => Promise.all(
+    landingProductFixes.map((fix) => Product.updateOne(fix.filter, { $set: fix.set })),
+  )).catch((error) => {
     landingProductsReady = undefined;
     console.error("No se pudieron crear los productos de las landings", error);
   });

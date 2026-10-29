@@ -179,16 +179,19 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
     validateDeliveryWindow(delivery.date, delivery.timeSlot);
     const deliveryFee = deliveryFeeForZone(delivery.zone);
 
-    const ids = items.map((item: { productId: string }) => item.productId);
+    // El mismo producto puede venir en varias líneas (un color por línea).
+    const ids = [...new Set(items.map((item: { productId: string }) => item.productId))];
     const products = await Product.find({ _id: { $in: ids }, available: true }).lean();
     if (products.length !== ids.length) throw new CustomError("Uno de los arreglos ya no está disponible", 400);
 
     const offer = await resolveOffer(offerId);
-    const normalizedItems = items.map((item: { productId: string; quantity: number }) => {
+    const normalizedItems = items.map((item: { productId: string; quantity: number; variant?: unknown }) => {
       const product = products.find((entry) => entry._id.toString() === item.productId);
       const quantity = Math.max(1, Math.min(10, Number(item.quantity) || 1));
       if (!product) throw new CustomError("Producto inválido", 400);
-      return { product: product._id, name: product.name, sku: product.sku, price: retailPrice(product.price), quantity };
+      const variant = typeof item.variant === "string" ? item.variant.trim().slice(0, 40) || undefined : undefined;
+      const name = variant ? `${product.name} · ${variant}` : product.name;
+      return { product: product._id, name, sku: product.sku, variant, price: retailPrice(product.price), quantity };
     });
     const subtotal = normalizedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const total = subtotal + deliveryFee;
