@@ -42,6 +42,16 @@ const landingProducts = [
 const landingProductFixes = [
   // El ramo se sembró a $109 base; Bruval confirmó el 29 oct 2026 "Jarrón de Rosas Preservadas $99".
   { filter: { sku: "BVRAMO01", price: 109 }, set: { price: 89, name: "Jarrón de rosas preservadas" } },
+  // Nombres heredados que se veían en checkout, correos y admin (BV0500 traía de descripción un texto de formas de pago).
+  { filter: { sku: "RP40", name: "Rosa preservada" }, set: { name: "La rosa de La Bella y la Bestia" } },
+  {
+    filter: { sku: "BV0500", name: "LLAVERO ROSA" },
+    set: {
+      name: "Llavero con rosa preservada",
+      description: "Rosa roja o girasol natural preservado dentro de una esfera transparente, con argolla y mosquetón dorados. Llega en caja de regalo Bruval.",
+      categories: ["Preservados"],
+    },
+  },
 ];
 
 let landingProductsReady: Promise<unknown> | undefined;
