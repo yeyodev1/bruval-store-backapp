@@ -4,7 +4,7 @@ import { CustomError } from "../errors/customError.error";
 import { Order } from "../models/order.model";
 import { Product } from "../models/product.model";
 import { ensureCatalog } from "../services/catalog.service";
-import { sendCheckoutStartedEmail, sendPaymentConfirmedEmail } from "../services/email.service";
+import { sendCheckoutStartedEmail, sendDeliveryConfirmedEmail, sendPaymentConfirmedEmail } from "../services/email.service";
 import { resolveOffer } from "../services/offer.service";
 import { optionalRetailPrice, retailPrice } from "../services/pricing.service";
 import { deliveryFeeForZone } from "../services/shipping.service";
@@ -173,11 +173,13 @@ export async function relayMetaEvent(req: Request, res: Response, next: NextFunc
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
   try {
     const { items, customer, delivery, offerId, tracking } = req.body;
-    if (!Array.isArray(items) || !items.length || !customer?.email || !customer?.name || !customer?.phone || customer.phoneConfirmed !== true || !delivery?.recipient || !delivery?.address || !delivery?.mapUrl || !delivery?.zone || !delivery?.date || !delivery?.timeSlot || !delivery?.messageCard) {
-      throw new CustomError("Completa todos los datos de entrega y contacto", 400);
+    if (!Array.isArray(items) || !items.length || !customer?.email || !customer?.name || !customer?.phone || customer.phoneConfirmed !== true) {
+      throw new CustomError("Completa tus datos de contacto", 400);
     }
-    validateDeliveryWindow(delivery.date, delivery.timeSlot);
-    const deliveryFee = deliveryFeeForZone(delivery.zone);
+    // Primero se paga y después se llena la entrega; las pestañas abiertas con el checkout anterior aún la envían.
+    if (delivery) validateDelivery(delivery);
+    // shortcut: el envío se cobra antes de saber el sector porque todos cuestan $0; si vuelven a tener costo, pedir el sector antes de pagar.
+    const deliveryFee = delivery ? deliveryFeeForZone(delivery.zone) : 0;
 
     // El mismo producto puede venir en varias líneas (un color por línea).
     const ids = [...new Set(items.map((item: { productId: string }) => item.productId))];
@@ -212,6 +214,33 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
 
     sendCheckoutStartedEmail(order).catch((error) => console.error("Checkout email failed", error));
     res.status(201).json({ orderNumber, total, payphone: { token: process.env.PAYPHONE_TOKEN?.trim(), storeId: process.env.PAYPHONE_STORE_ID?.trim() } });
+  } catch (error) {
+    next(error);
+  }
+}
+
+function validateDelivery(delivery: any) {
+  if (!delivery?.recipient || !delivery?.address || !delivery?.mapUrl || !delivery?.zone || !delivery?.date || !delivery?.timeSlot || !delivery?.messageCard) {
+    throw new CustomError("Completa todos los datos de entrega", 400);
+  }
+  validateDeliveryWindow(delivery.date, delivery.timeSlot);
+  deliveryFeeForZone(delivery.zone);
+}
+
+/** Datos de entrega de un pedido ya pagado. El id de pago de PayPhone prueba que es quien pagó. */
+export async function completeOrderDelivery(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { paymentId, delivery } = req.body;
+    const order = await Order.findOne({ orderNumber: String(req.params.orderNumber || "") });
+    if (!order || order.status !== "paid" || !paymentId || String(order.payphone?.transactionId) !== String(paymentId)) {
+      throw new CustomError("No encontramos un pedido pagado con esos datos", 404);
+    }
+    validateDelivery(delivery);
+    const { recipient, address, mapUrl, zone, date, timeSlot, messageCard } = delivery;
+    order.delivery = { recipient, address, mapUrl, zone, date, timeSlot, messageCard };
+    await order.save();
+    sendDeliveryConfirmedEmail(order).catch((error) => console.error("Delivery email failed", error));
+    res.json({ orderNumber: order.orderNumber, delivery: order.delivery });
   } catch (error) {
     next(error);
   }

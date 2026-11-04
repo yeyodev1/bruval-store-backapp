@@ -26,14 +26,15 @@ const orderSchema = new Schema(
       phone: { type: String, required: true, trim: true },
       phoneConfirmed: { type: Boolean, required: true },
     },
+    /** Se llena después del pago (/orders/:orderNumber/delivery). */
     delivery: {
-      recipient: { type: String, required: true, trim: true },
-      address: { type: String, required: true, trim: true },
-      mapUrl: { type: String, required: true, trim: true },
-      zone: { type: String, required: true, trim: true },
-      date: { type: String, required: true, trim: true },
-      timeSlot: { type: String, required: true, trim: true },
-      messageCard: { type: String, required: true, trim: true },
+      recipient: { type: String, trim: true },
+      address: { type: String, trim: true },
+      mapUrl: { type: String, trim: true },
+      zone: { type: String, trim: true },
+      date: { type: String, trim: true },
+      timeSlot: { type: String, trim: true },
+      messageCard: { type: String, trim: true },
     },
     status: {
       type: String,
