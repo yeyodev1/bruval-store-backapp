@@ -29,7 +29,7 @@ function publicProduct(product: any) {
 }
 
 function storeUrl() {
-  return (process.env.STORE_URL || "https://store.bruval.com.ec").replace(/\/+$/, "");
+  return (process.env.STORE_URL || "https://bruval.ec").replace(/\/+$/, "");
 }
 
 function validateDeliveryWindow(date: unknown, timeSlot: unknown) {

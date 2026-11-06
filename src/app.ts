@@ -15,6 +15,8 @@ const whitelist = [
   "https://testing-storybrand-frontend.bakano.ec",
   "https://bruval-store-frontapp.vercel.app",
   "https://store.bruval.com.ec",
+  "https://bruval.ec",
+  "https://www.bruval.ec",
 ];
 
 function isAllowedOrigin(origin: string) {
